@@ -1,0 +1,115 @@
+---
+title: "Markdown"
+author: "Alireza Moradi"
+date: "8/16/2019"
+output: html_document
+---
+# Analyzing damage on public health and economy 
+#### Caused by severe weather events
+A brief abalysis on the amount of harm done by different severe weather events on public health and economic consequences.
+
+The basic goal of this paper is to explore the NOAA Storm Database and answer some basic questions about severe weather events.
+The below analysis was run on a MacBook Pro, 2.9Ghz intel core i7 cpu, MacOs Mojave 10.14.6.
+
+```{r setup, include=FALSE,echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Data Processing
+Loading required packages and the data into R.
+```{r,message=FALSE}
+library(R.utils)
+library(data.table)
+library(dplyr)
+library(ggplot2)
+```
+```{r,cache=TRUE,message=FALSE}
+data <- fread("02_course-project-2_repdata-data-StormData.csv.bz2", sep = ",", header = T)
+```
+
+# Questions
+### 1. Across the United States, which types of events are most harmful with respect to population health?
+```{r,cache=TRUE}
+fatalities <- data %>% select(EVTYPE,FATALITIES) %>% group_by(EVTYPE) %>% summarise(sum = sum(FATALITIES)) %>% arrange(-sum)
+print(fatalities)
+```
+Total number of fatalities caused by each type of Event.
+
+```{r,cache=TRUE}
+injuries <- data %>% select(EVTYPE,INJURIES) %>% group_by(EVTYPE) %>% summarise(sum = sum(INJURIES)) %>% arrange(-sum)
+print(injuries)
+```
+Total number of injuries caused by each type of Event.
+
+### 2. Across the United States, which types of events have the greatest economic consequences?
+
+```{r,cache=TRUE}
+w <- function(k){
+    for(EXP in k){
+        if(toupper(EXP) == "K"){
+            k <- as.numeric(10^3)
+        }
+        else if(toupper(EXP) == "M"){
+            k <- as.numeric(10^6)
+        }
+        else if(toupper(EXP) == "B"){
+            k <- as.numeric(10^9)
+        }
+        else if(toupper(EXP) == "H"){
+            k <- as.numeric(10^2)
+        }
+        else if(EXP == "?" | EXP == "" | EXP == "-"){
+            k <- as.numeric(0)
+        }
+        else{
+            k <- as.numeric(0)
+        }
+    }
+    k
+}
+data$PROPDMGEXP <- sapply(X = data$PROPDMGEXP,FUN = w,simplify = "array")
+data$CROPDMGEXP <- sapply(X = data$CROPDMGEXP,FUN = w,simplify = "array")
+data$PROPDMG <- data$PROPDMG * data$PROPDMGEXP
+data$CROPDMG <- data$CROPDMG * data$CROPDMGEXP
+
+temp <- data %>% group_by(EVTYPE) %>% summarise(sum = sum(PROPDMG,CROPDMG)) %>% arrange(-sum)
+print(temp)
+```
+Total economy impact seperated by Events.
+
+# Results
+### Public Health Impact
+```{r,fig.align='center'}
+g <- ggplot(fatalities[1:10,],aes(reorder(factor(EVTYPE),-sum),sum))
+g <- g + geom_bar(stat = "identity") + ylim(c(0,6000))
+g <- g + theme(axis.text.x = element_text(angle=45, vjust=1, hjust=1),plot.title = element_text(hjust = 0.5))
+g <- g + labs(x = "Event",y = "Total fatalities",title = "Top 10 Events with highest total fatalities")
+print(g)
+```
+
+According to the above plot, Tornado has the highest total fatalities followed by Excessive Heat and Flash Flood.
+
+```{r,fig.align='center'}
+g <- ggplot(injuries[1:10,],aes(reorder(factor(EVTYPE),-sum),sum))
+g <- g + geom_bar(stat = "identity") + ylim(c(0,100000))
+g <- g + theme(axis.text.x = element_text(angle=45, vjust=1, hjust=1),plot.title = element_text(hjust = 0.5))
+g <- g + labs(x = "Event",y = "Total injuries",title = "Top 10 Events with highest total injuries")
+print(g)
+```
+
+According to the above plot, Tornado caused around 91000 injuries which is the highest, Followed by TSTM Wind and FLood.
+
+#### Conclusion
+Tornado has the highest health impact altogether.
+
+### Economy Impact
+```{r,fig.align='center'}
+g <- ggplot(temp[1:10,],aes(reorder(factor(EVTYPE),-sum),sum))
+g <- g + geom_bar(stat = "identity")
+g <- g + theme(axis.text.x = element_text(angle=45, vjust=1, hjust=1),plot.title = element_text(hjust = 0.5))
+g <- g + labs(x = "Event",y = "Total economy impact($USD)",title = "Top 10 Events with highest economic impact")
+print(g)
+```
+
+According to the above plot, Flood caused around "150 BILLION $" of damage, Which is the highest economy impact among all others.
